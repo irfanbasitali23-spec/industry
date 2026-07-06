@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}New Inspection - Machine Inspection{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 id="formTitle">Machine Inspection Checklist</h1>
+        <p class="text-muted">Complete all sections and sign digitally before submitting</p>
+    </div>
+</div>
+
+<form id="inspectionForm" class="inspection-form">
+    <div class="card form-header-card">
+        <div class="form-row three-col">
+            <div class="form-group">
+                <label>Customer</label>
+                <input type="text" name="customer" placeholder="Customer name">
+            </div>
+            <div class="form-group">
+                <label>Contact Person</label>
+                <input type="text" name="contact_person" placeholder="Contact person">
+            </div>
+            <div class="form-group">
+                <label>Date</label>
+                <input type="date" name="inspection_date">
+            </div>
+        </div>
+        <div class="form-row two-col">
+            <div class="form-group">
+                <label>Machine Type</label>
+                <input type="text" name="machine_type" placeholder="Machine type">
+            </div>
+            <div class="form-group">
+                <label>Sr. No</label>
+                <input type="text" name="serial_no" placeholder="Serial number">
+            </div>
+        </div>
+    </div>
+
+    <div id="checklistColumns" class="checklist-grid">
+        <div class="text-center text-muted" style="grid-column: 1/-1; padding: 2rem;">Loading checklist...</div>
+    </div>
+
+    <div class="card">
+        <h3>Machine Status</h3>
+        <textarea name="machine_status" rows="3" placeholder="Describe machine status..."></textarea>
+    </div>
+
+    <div class="card">
+        <h3>Action Taken</h3>
+        <textarea name="action_taken" rows="3" placeholder="Describe actions taken..."></textarea>
+    </div>
+
+    <div class="card">
+        <h3>Remarks</h3>
+        <textarea name="remarks" rows="3" placeholder="Additional remarks..."></textarea>
+    </div>
+
+    <div class="signature-section">
+        <div class="card signature-card">
+            <h3>Engineer Signature</h3>
+            <input type="text" name="engineer_name" placeholder="Engineer Name" class="sig-name-input">
+            <div class="signature-pad-wrapper">
+                <canvas id="engineerSig" class="signature-canvas" width="400" height="150"></canvas>
+                <button type="button" class="btn btn-sm btn-ghost clear-sig" data-canvas="engineerSig">Clear</button>
+            </div>
+        </div>
+        <div class="card signature-card">
+            <h3>Customer Signature</h3>
+            <input type="text" name="customer_name" placeholder="Customer Name" class="sig-name-input">
+            <div class="signature-pad-wrapper">
+                <canvas id="customerSig" class="signature-canvas" width="400" height="150"></canvas>
+                <button type="button" class="btn btn-sm btn-ghost clear-sig" data-canvas="customerSig">Clear</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="form-actions">
+        <a href="/dashboard" class="btn btn-outline">Cancel</a>
+        <button type="submit" class="btn btn-primary" id="submitBtn">Submit Inspection</button>
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/signature.js"></script>
+<script src="/static/js/form.js"></script>
+<script>
+    initInspectionForm();
+</script>
+{% endblock %}

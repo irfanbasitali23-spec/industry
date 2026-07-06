@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Submissions - Admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>All Submissions</h1>
+        <p class="text-muted">View all submitted inspection forms</p>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <input type="text" id="searchInput" class="search-input" placeholder="Search by customer, machine, user...">
+    </div>
+    <div class="table-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Submitted By</th>
+                    <th>Customer</th>
+                    <th>Contact</th>
+                    <th>Machine Type</th>
+                    <th>Serial No</th>
+                    <th>Inspection Date</th>
+                    <th>Submitted At</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="submissionsTable">
+                <tr><td colspan="9" class="text-center text-muted">Loading...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let allSubmissions = [];
+
+    function renderTable(data) {
+        const tbody = document.getElementById('submissionsTable');
+        if (data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted">No submissions found</td></tr>';
+            return;
+        }
+        tbody.innerHTML = data.map(s => `
+            <tr>
+                <td>#${s.id}</td>
+                <td>${s.full_name || s.username}</td>
+                <td>${s.customer || '-'}</td>
+                <td>${s.contact_person || '-'}</td>
+                <td>${s.machine_type || '-'}</td>
+                <td>${s.serial_no || '-'}</td>
+                <td>${s.inspection_date || '-'}</td>
+                <td>${new Date(s.submitted_at).toLocaleString()}</td>
+                <td><a href="/form/view/${s.id}" class="btn btn-sm btn-outline">View</a></td>
+            </tr>
+        `).join('');
+    }
+
+    async function loadSubmissions() {
+        const res = await apiFetch('/api/admin/submissions');
+        if (!res) return;
+        allSubmissions = await res.json();
+        renderTable(allSubmissions);
+    }
+
+    document.getElementById('searchInput').addEventListener('input', (e) => {
+        const q = e.target.value.toLowerCase();
+        const filtered = allSubmissions.filter(s =>
+            (s.customer || '').toLowerCase().includes(q) ||
+            (s.machine_type || '').toLowerCase().includes(q) ||
+            (s.serial_no || '').toLowerCase().includes(q) ||
+            (s.full_name || '').toLowerCase().includes(q) ||
+            (s.username || '').toLowerCase().includes(q)
+        );
+        renderTable(filtered);
+    });
+
+    loadSubmissions();
+</script>
+{% endblock %}

@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Machine Inspection System{% endblock %}</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    {% if user is defined and user %}
+    <nav class="navbar">
+        <div class="nav-brand">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="3" width="20" height="14" rx="2"/>
+                <line x1="8" y1="21" x2="16" y2="21"/>
+                <line x1="12" y1="17" x2="12" y2="21"/>
+            </svg>
+            Machine Inspection
+        </div>
+        <div class="nav-links">
+            {% if user.role == 'admin' %}
+            <a href="/admin" class="nav-link">Dashboard</a>
+            <a href="/admin/submissions" class="nav-link">Submissions</a>
+            <a href="/admin/form-editor" class="nav-link">Form Editor</a>
+            <a href="/admin/users" class="nav-link">Users</a>
+            {% else %}
+            <a href="/dashboard" class="nav-link">Dashboard</a>
+            <a href="/form/new" class="nav-link">New Inspection</a>
+            {% endif %}
+        </div>
+        <div class="nav-user">
+            <span class="user-badge">{{ user.full_name or user.username }}</span>
+            <span class="role-badge role-{{ user.role }}">{{ user.role }}</span>
+            <button class="btn btn-ghost btn-sm" onclick="logout()">Logout</button>
+        </div>
+    </nav>
+    {% endif %}
+
+    <main class="main-content">
+        {% block content %}{% endblock %}
+    </main>
+
+    <div id="toast" class="toast hidden"></div>
+
+    <script>
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = `toast toast-${type}`;
+            setTimeout(() => toast.classList.add('hidden'), 3000);
+        }
+
+        async function apiFetch(url, options = {}) {
+            const token = localStorage.getItem('access_token');
+            const headers = { 'Content-Type': 'application/json', ...options.headers };
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+            const res = await fetch(url, { ...options, headers });
+            if (res.status === 401) {
+                localStorage.removeItem('access_token');
+                window.location.href = '/login';
+                return null;
+            }
+            return res;
+        }
+
+        async function logout() {
+            await fetch('/api/auth/logout', { method: 'POST' });
+            localStorage.removeItem('access_token');
+            window.location.href = '/login';
+        }
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

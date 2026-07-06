@@ -1,0 +1,240 @@
+{% extends "base.html" %}
+{% block title %}Form Editor - Admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Form Editor</h1>
+        <p class="text-muted">Customize form appearance and manage checklist questions</p>
+    </div>
+</div>
+
+<div class="editor-grid">
+    <div class="card">
+        <div class="card-header"><h2>Form Style</h2></div>
+        <form id="styleForm" class="style-form">
+            <div class="form-group">
+                <label>Form Title</label>
+                <input type="text" id="formTitle" name="form_title">
+            </div>
+            <div class="form-row two-col">
+                <div class="form-group">
+                    <label>Primary Color</label>
+                    <input type="color" id="primaryColor" name="primary_color">
+                </div>
+                <div class="form-group">
+                    <label>Accent Color</label>
+                    <input type="color" id="accentColor" name="accent_color">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Header Background</label>
+                <input type="color" id="headerBg" name="header_bg">
+            </div>
+            <div class="form-group">
+                <label>Font Family</label>
+                <select id="fontFamily" name="font_family">
+                    <option value="Segoe UI, system-ui, sans-serif">Segoe UI</option>
+                    <option value="Arial, sans-serif">Arial</option>
+                    <option value="Georgia, serif">Georgia</option>
+                    <option value="'Courier New', monospace">Courier New</option>
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary">Save Style</button>
+        </form>
+        <div class="style-preview" id="stylePreview">
+            <div class="preview-header">Preview</div>
+            <div class="preview-body">Sample form element</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h2>Checklist Questions</h2>
+            <button class="btn btn-sm btn-primary" onclick="openAddFieldModal()">+ Add Question</button>
+        </div>
+        <div class="fields-list" id="fieldsList">
+            <div class="text-muted text-center" style="padding: 2rem;">Loading...</div>
+        </div>
+    </div>
+</div>
+
+<div id="fieldModal" class="modal hidden">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 id="modalTitle">Add Question</h2>
+            <button class="modal-close" onclick="closeFieldModal()">&times;</button>
+        </div>
+        <form id="fieldForm">
+            <input type="hidden" id="fieldId">
+            <div class="form-row two-col">
+                <div class="form-group">
+                    <label>Item Number</label>
+                    <input type="number" id="fieldNumber" min="1" max="99">
+                </div>
+                <div class="form-group">
+                    <label>Sort Order</label>
+                    <input type="number" id="sortOrder" min="0">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Section Name</label>
+                <input type="text" id="fieldSection" placeholder="e.g. Machine PLC">
+            </div>
+            <div class="form-group">
+                <label>Question Label</label>
+                <input type="text" id="fieldLabel" required placeholder="e.g. PLC Buttons">
+            </div>
+            <div class="form-group">
+                <label>Options (comma-separated)</label>
+                <input type="text" id="fieldOptions" placeholder="Working, Not Working">
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-outline" onclick="closeFieldModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Question</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let templateData = null;
+
+    function applyPreview(style) {
+        const preview = document.getElementById('stylePreview');
+        preview.style.setProperty('--preview-primary', style.primary_color);
+        preview.style.setProperty('--preview-accent', style.accent_color);
+        preview.style.fontFamily = style.font_family;
+        preview.querySelector('.preview-header').style.background = style.header_bg;
+        preview.querySelector('.preview-header').style.color = style.primary_color;
+        preview.querySelector('.preview-body').style.borderColor = style.accent_color;
+    }
+
+    async function loadTemplate() {
+        const res = await apiFetch('/api/admin/template');
+        if (!res) return;
+        templateData = await res.json();
+        const style = templateData.style_config;
+
+        document.getElementById('formTitle').value = style.form_title || '';
+        document.getElementById('primaryColor').value = style.primary_color || '#1e3a5f';
+        document.getElementById('accentColor').value = style.accent_color || '#2563eb';
+        document.getElementById('headerBg').value = style.header_bg || '#f8fafc';
+        document.getElementById('fontFamily').value = style.font_family || 'Segoe UI, system-ui, sans-serif';
+        applyPreview(style);
+        renderFields();
+    }
+
+    function renderFields() {
+        const list = document.getElementById('fieldsList');
+        if (!templateData.fields.length) {
+            list.innerHTML = '<div class="text-muted text-center">No questions yet</div>';
+            return;
+        }
+        list.innerHTML = templateData.fields.map(f => `
+            <div class="field-item">
+                <div class="field-info">
+                    <span class="field-num">#${f.field_number || '-'}</span>
+                    <div>
+                        <strong>${f.section || 'General'}</strong> — ${f.label}
+                        <div class="field-options">${(f.options || []).join(' | ')}</div>
+                    </div>
+                </div>
+                <div class="field-actions">
+                    <button class="btn btn-sm btn-outline" onclick="editField(${f.id})">Edit</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteField(${f.id})">Delete</button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    document.getElementById('styleForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const style_config = {
+            form_title: document.getElementById('formTitle').value,
+            primary_color: document.getElementById('primaryColor').value,
+            accent_color: document.getElementById('accentColor').value,
+            header_bg: document.getElementById('headerBg').value,
+            font_family: document.getElementById('fontFamily').value,
+        };
+        const res = await apiFetch('/api/admin/template/style', {
+            method: 'PUT',
+            body: JSON.stringify({ style_config }),
+        });
+        if (res && res.ok) {
+            showToast('Style saved successfully', 'success');
+            applyPreview(style_config);
+        }
+    });
+
+    ['primaryColor', 'accentColor', 'headerBg', 'fontFamily'].forEach(id => {
+        document.getElementById(id).addEventListener('input', () => {
+            applyPreview({
+                primary_color: document.getElementById('primaryColor').value,
+                accent_color: document.getElementById('accentColor').value,
+                header_bg: document.getElementById('headerBg').value,
+                font_family: document.getElementById('fontFamily').value,
+            });
+        });
+    });
+
+    function openAddFieldModal() {
+        document.getElementById('modalTitle').textContent = 'Add Question';
+        document.getElementById('fieldForm').reset();
+        document.getElementById('fieldId').value = '';
+        document.getElementById('fieldModal').classList.remove('hidden');
+    }
+
+    function closeFieldModal() {
+        document.getElementById('fieldModal').classList.add('hidden');
+    }
+
+    function editField(id) {
+        const field = templateData.fields.find(f => f.id === id);
+        if (!field) return;
+        document.getElementById('modalTitle').textContent = 'Edit Question';
+        document.getElementById('fieldId').value = field.id;
+        document.getElementById('fieldNumber').value = field.field_number || '';
+        document.getElementById('sortOrder').value = field.sort_order;
+        document.getElementById('fieldSection').value = field.section || '';
+        document.getElementById('fieldLabel').value = field.label;
+        document.getElementById('fieldOptions').value = (field.options || []).join(', ');
+        document.getElementById('fieldModal').classList.remove('hidden');
+    }
+
+    document.getElementById('fieldForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const fieldId = document.getElementById('fieldId').value;
+        const payload = {
+            field_number: parseInt(document.getElementById('fieldNumber').value) || null,
+            sort_order: parseInt(document.getElementById('sortOrder').value) || 0,
+            section: document.getElementById('fieldSection').value,
+            label: document.getElementById('fieldLabel').value,
+            field_type: 'radio',
+            options: document.getElementById('fieldOptions').value.split(',').map(s => s.trim()).filter(Boolean),
+        };
+
+        const url = fieldId ? `/api/admin/fields/${fieldId}` : '/api/admin/fields';
+        const method = fieldId ? 'PUT' : 'POST';
+        const res = await apiFetch(url, { method, body: JSON.stringify(payload) });
+        if (res && res.ok) {
+            showToast(fieldId ? 'Question updated' : 'Question added', 'success');
+            closeFieldModal();
+            loadTemplate();
+        }
+    });
+
+    async function deleteField(id) {
+        if (!confirm('Delete this question?')) return;
+        const res = await apiFetch(`/api/admin/fields/${id}`, { method: 'DELETE' });
+        if (res && res.ok) {
+            showToast('Question deleted', 'success');
+            loadTemplate();
+        }
+    }
+
+    loadTemplate();
+</script>
+{% endblock %}

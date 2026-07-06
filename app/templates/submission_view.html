@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}View Submission - Machine Inspection{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Inspection Report #<span id="submissionId">{{ submission_id }}</span></h1>
+        <p class="text-muted" id="submittedInfo">Loading...</p>
+    </div>
+    <a href="/dashboard" class="btn btn-outline">Back to Dashboard</a>
+</div>
+
+<div id="submissionContent">
+    <div class="text-center text-muted" style="padding: 3rem;">Loading submission...</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const submissionId = {{ submission_id }};
+
+    async function loadSubmission() {
+        const res = await apiFetch(`/api/forms/submission/${submissionId}`);
+        if (!res) return;
+        const data = await res.json();
+        const s = data.submission;
+
+        document.getElementById('submittedInfo').textContent =
+            `Submitted by ${data.full_name || data.username} on ${new Date(s.submitted_at).toLocaleString()}`;
+
+        const col1 = [], col2 = [], col3 = [];
+        data.fields.forEach(f => {
+            const item = { ...f, answer: data.answers[f.id] || '-' };
+            if (f.field_number <= 9) col1.push(item);
+            else if (f.field_number <= 18) col2.push(item);
+            else col3.push(item);
+        });
+
+        function renderColumn(items) {
+            const grouped = {};
+            items.forEach(item => {
+                if (!grouped[item.section]) grouped[item.section] = [];
+                grouped[item.section].push(item);
+            });
+            return Object.entries(grouped).map(([section, fields]) => `
+                <div class="checklist-section">
+                    <div class="section-header">${fields[0].field_number}. ${section}</div>
+                    ${fields.map(f => `
+                        <div class="checklist-item view-mode">
+                            <span class="item-label">${f.label}</span>
+                            <span class="item-answer badge">${f.answer}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            `).join('');
+        }
+
+        document.getElementById('submissionContent').innerHTML = `
+            <div class="card form-header-card view-mode">
+                <div class="info-grid">
+                    <div><strong>Customer:</strong> ${s.customer || '-'}</div>
+                    <div><strong>Contact Person:</strong> ${s.contact_person || '-'}</div>
+                    <div><strong>Date:</strong> ${s.inspection_date || '-'}</div>
+                    <div><strong>Machine Type:</strong> ${s.machine_type || '-'}</div>
+                    <div><strong>Sr. No:</strong> ${s.serial_no || '-'}</div>
+                </div>
+            </div>
+            <div class="checklist-grid">${renderColumn(col1)}${renderColumn(col2)}${renderColumn(col3)}</div>
+            <div class="card"><h3>Machine Status</h3><p>${s.machine_status || '-'}</p></div>
+            <div class="card"><h3>Action Taken</h3><p>${s.action_taken || '-'}</p></div>
+            <div class="card"><h3>Remarks</h3><p>${s.remarks || '-'}</p></div>
+            <div class="signature-section view-mode">
+                <div class="card signature-card">
+                    <h3>Engineer: ${s.engineer_name || '-'}</h3>
+                    ${s.engineer_signature ? `<img src="${s.engineer_signature}" class="sig-image" alt="Engineer signature">` : '<p class="text-muted">No signature</p>'}
+                </div>
+                <div class="card signature-card">
+                    <h3>Customer: ${s.customer_name || '-'}</h3>
+                    ${s.customer_signature ? `<img src="${s.customer_signature}" class="sig-image" alt="Customer signature">` : '<p class="text-muted">No signature</p>'}
+                </div>
+            </div>
+        `;
+    }
+    loadSubmission();
+</script>
+{% endblock %}

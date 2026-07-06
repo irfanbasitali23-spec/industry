@@ -1,0 +1,54 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: machine_inspection_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-inspection_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-inspection_pass}
+      POSTGRES_DB: ${POSTGRES_DB:-machine_inspection}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-inspection_user} -d ${POSTGRES_DB:-machine_inspection}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build: .
+    container_name: machine_inspection_api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-inspection_user}:${POSTGRES_PASSWORD:-inspection_pass}@db:5432/${POSTGRES_DB:-machine_inspection}
+      SECRET_KEY: ${SECRET_KEY:-change-this-secret-key-in-production}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    volumes:
+      - ./app:/app/app
+
+  frontend:
+    build: ./frontend
+    container_name: machine_inspection_frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      web:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

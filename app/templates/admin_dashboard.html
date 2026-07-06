@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block title %}Admin Dashboard{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Admin Dashboard</h1>
+        <p class="text-muted">Manage inspections, forms, and users</p>
+    </div>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-value" id="totalSubmissions">-</div>
+        <div class="stat-label">Total Submissions</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" id="totalUsers">-</div>
+        <div class="stat-label">Active Users</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" id="totalFields">-</div>
+        <div class="stat-label">Form Questions</div>
+    </div>
+</div>
+
+<div class="admin-quick-links">
+    <a href="/admin/submissions" class="quick-link-card">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+        </svg>
+        <h3>View Submissions</h3>
+        <p>Review all submitted inspection forms</p>
+    </a>
+    <a href="/admin/form-editor" class="quick-link-card">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+        </svg>
+        <h3>Form Editor</h3>
+        <p>Customize form style and add questions</p>
+    </a>
+    <a href="/admin/users" class="quick-link-card">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+        </svg>
+        <h3>Manage Users</h3>
+        <p>Add and manage user accounts</p>
+    </a>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2>Recent Submissions</h2>
+        <a href="/admin/submissions" class="btn btn-sm btn-outline">View All</a>
+    </div>
+    <div class="table-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Submitted By</th>
+                    <th>Customer</th>
+                    <th>Machine</th>
+                    <th>Date</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="recentTable">
+                <tr><td colspan="6" class="text-center text-muted">Loading...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function loadDashboard() {
+        const [subsRes, usersRes, templateRes] = await Promise.all([
+            apiFetch('/api/admin/submissions'),
+            apiFetch('/api/admin/users'),
+            apiFetch('/api/admin/template'),
+        ]);
+        if (!subsRes || !usersRes || !templateRes) return;
+
+        const submissions = await subsRes.json();
+        const users = await usersRes.json();
+        const template = await templateRes.json();
+
+        document.getElementById('totalSubmissions').textContent = submissions.length;
+        document.getElementById('totalUsers').textContent = users.filter(u => u.is_active).length;
+        document.getElementById('totalFields').textContent = template.fields.length;
+
+        const tbody = document.getElementById('recentTable');
+        const recent = submissions.slice(0, 5);
+        if (recent.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No submissions yet</td></tr>';
+            return;
+        }
+        tbody.innerHTML = recent.map(s => `
+            <tr>
+                <td>#${s.id}</td>
+                <td>${s.full_name || s.username}</td>
+                <td>${s.customer || '-'}</td>
+                <td>${s.machine_type || '-'}</td>
+                <td>${new Date(s.submitted_at).toLocaleDateString()}</td>
+                <td><a href="/form/view/${s.id}" class="btn btn-sm btn-outline">View</a></td>
+            </tr>
+        `).join('');
+    }
+    loadDashboard();
+</script>
+{% endblock %}

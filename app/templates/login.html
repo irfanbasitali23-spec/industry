@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Machine Inspection System</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="login-page">
+    <div class="login-container">
+        <div class="login-card">
+            <div class="login-header">
+                <div class="login-icon">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <rect x="2" y="3" width="20" height="14" rx="2"/>
+                        <line x1="8" y1="21" x2="16" y2="21"/>
+                        <line x1="12" y1="17" x2="12" y2="21"/>
+                    </svg>
+                </div>
+                <h1>Machine Inspection System</h1>
+                <p>Sign in to access your dashboard</p>
+            </div>
+            <form id="loginForm" class="login-form">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" required placeholder="Enter username" autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" required placeholder="Enter password" autocomplete="current-password">
+                </div>
+                <button type="submit" class="btn btn-primary btn-block" id="loginBtn">Sign In</button>
+                <div id="loginError" class="error-message hidden"></div>
+            </form>
+            <div class="login-demo">
+                <p><strong>Demo Accounts:</strong></p>
+                <p>Admin: <code>admin</code> / <code>admin123</code></p>
+                <p>User: <code>user</code> / <code>user123</code></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('loginBtn');
+            const errorEl = document.getElementById('loginError');
+            btn.disabled = true;
+            btn.textContent = 'Signing in...';
+            errorEl.classList.add('hidden');
+
+            try {
+                const res = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username: document.getElementById('username').value,
+                        password: document.getElementById('password').value,
+                    }),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || 'Login failed');
+
+                localStorage.setItem('access_token', data.access_token);
+                window.location.href = data.role === 'admin' ? '/admin' : '/dashboard';
+            } catch (err) {
+                errorEl.textContent = err.message;
+                errorEl.classList.remove('hidden');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Sign In';
+            }
+        });
+    </script>
+</body>
+</html>
