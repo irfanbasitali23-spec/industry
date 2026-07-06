@@ -1,39 +1,91 @@
 # Machine Inspection System
 
-A full-stack machine inspection checklist platform with a **React** frontend, **FastAPI** backend, and **PostgreSQL** database — all in Docker.
+Full-stack machine inspection platform — React frontend, FastAPI backend, PostgreSQL.
 
-## Features
-
-- **React UI** — Modern design with Tailwind CSS, Framer Motion animations, responsive layout
-- **User Dashboard** — Fill 26-point inspection forms with digital signatures
-- **Admin Dashboard** — View submissions, customize form style, manage questions & users
-- **PostgreSQL** — Persistent storage for all data
-- **Docker** — One command to run everything
-
-## Quick Start (Docker)
+## Local (Docker)
 
 ```bash
 docker compose up --build
 ```
 
-| Service  | URL                        |
-|----------|----------------------------|
-| Frontend | http://localhost:3000      |
-| API      | http://localhost:8000      |
+| Service  | URL                   |
+|----------|-----------------------|
+| Frontend | http://localhost:3000 |
+| API      | http://localhost:8000 |
 
-### Demo Accounts
+**Demo:** `admin` / `admin123` · `user` / `user123`
 
-| Role  | Username | Password  |
-|-------|----------|-----------|
-| Admin | admin    | admin123  |
-| User  | user     | user123   |
+---
 
-## Local Development
+## Cloud deployment (free tier)
+
+Vercel **cannot** run PostgreSQL or Docker. Use this split:
+
+| Part       | Platform | Free tier |
+|------------|----------|-----------|
+| Frontend   | **Vercel** | Yes       |
+| API        | **Render** | Yes       |
+| Database   | **Neon**   | Yes       |
+
+### Step 1 — Database (Neon)
+
+1. Create account at [neon.tech](https://neon.tech)
+2. Create a project → copy the **connection string**
+3. It looks like: `postgresql://user:pass@ep-xxx.neon.tech/neondb?sslmode=require`
+
+### Step 2 — Backend (Render)
+
+1. Push this repo to GitHub
+2. Go to [render.com](https://render.com) → **New → Blueprint**
+3. Connect repo — Render reads `render.yaml`
+4. Set environment variables:
+   - `DATABASE_URL` = your Neon connection string
+   - `CORS_ORIGINS` = `https://YOUR-APP.vercel.app` (set after Step 3)
+   - `ADMIN_PASSWORD` = your secure admin password
+5. Deploy → note API URL, e.g. `https://inspectpro-api.onrender.com`
+
+### Step 3 — Frontend (Vercel)
+
+1. Go to [vercel.com](https://vercel.com) → **Add New Project**
+2. Import GitHub repo
+3. Set **Root Directory** = `frontend`
+4. Framework: **Vite** (auto-detected)
+5. Environment variable:
+   ```
+   VITE_API_URL=https://inspectpro-api.onrender.com/api
+   ```
+   (use your real Render API URL + `/api`)
+6. Deploy
+
+### Step 4 — Update CORS
+
+Back on Render, set `CORS_ORIGINS` to your Vercel URL:
+```
+https://your-project.vercel.app
+```
+
+Redeploy the API if needed.
+
+---
+
+## Why the error happened
+
+```
+connection to server at "localhost" port 5432 failed
+```
+
+On Vercel/Render there is **no local PostgreSQL**. You must set `DATABASE_URL` to a **cloud** database (Neon, Supabase, etc.).
+
+---
+
+## Local development (no Docker)
+
+**Database:** `docker compose up db -d`
 
 **Backend:**
 ```bash
-docker compose up db -d
 pip install -r requirements.txt
+# set DATABASE_URL in .env
 uvicorn app.main:app --reload --port 8000
 ```
 
@@ -44,38 +96,13 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173 (Vite proxies `/api` to backend)
+---
 
 ## Architecture
 
 ```
-├── app/                  # FastAPI backend (API only)
-│   ├── main.py
-│   ├── models.py
-│   ├── routers/          # auth, forms, admin APIs
-│   └── seed.py           # 26 checklist items
-├── frontend/             # React + Vite + Tailwind
-│   ├── src/
-│   │   ├── pages/        # Login, Dashboard, Admin pages
-│   │   ├── components/   # Layout, SignaturePad, etc.
-│   │   └── api/          # API client
-│   └── Dockerfile        # nginx production build
-└── docker-compose.yml    # db + api + frontend
+frontend/          → Vercel (React + Vite)
+app/               → Render (FastAPI)
+PostgreSQL         → Neon (cloud)
+docker-compose.yml → local development only
 ```
-
-## Tech Stack
-
-| Layer    | Technology                          |
-|----------|-------------------------------------|
-| Frontend | React 18, Vite, Tailwind, Framer Motion |
-| Backend  | FastAPI, SQLAlchemy, JWT            |
-| Database | PostgreSQL 16                       |
-| Deploy   | Docker Compose, nginx                 |
-
-## Stop
-
-```bash
-docker compose down
-```
-
-Remove data: `docker compose down -v`
