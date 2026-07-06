@@ -1,4 +1,5 @@
 import os
+from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -16,9 +17,56 @@ CLOUD_ENV_MARKERS = (
     "AWS_LAMBDA_FUNCTION_NAME",
 )
 
+# Explicit DATABASE_URL wins (Docker Compose sets this for local db)
+DATABASE_URL_ENV_KEYS = (
+    "DATABASE_URL",
+    "DATABASE_URL_UNPOOLED",
+    "POSTGRES_URL_NON_POOLING",
+    "POSTGRES_URL",
+    "POSTGRES_PRISMA_URL",
+)
+
 
 def _is_cloud_host() -> bool:
     return any(os.getenv(key) for key in CLOUD_ENV_MARKERS)
+
+
+def _clean_database_url(url: str) -> str:
+    if url.startswith("postgres://"):
+        url = url.replace("postgres://", "postgresql://", 1)
+
+    parsed = urlparse(url)
+    params = parse_qs(parsed.query, keep_blank_values=True)
+    # psycopg2 can fail with channel_binding on some platforms
+    params.pop("channel_binding", None)
+    if "sslmode" not in params and _is_cloud_host():
+        params["sslmode"] = ["require"]
+
+    flat = {k: v[0] if isinstance(v, list) else v for k, v in params.items()}
+    query = urlencode(flat)
+    return urlunparse(parsed._replace(query=query))
+
+
+def resolve_database_url_from_env() -> str | None:
+    """Read Neon / Vercel Postgres env vars (integration sets these automatically)."""
+    for key in DATABASE_URL_ENV_KEYS:
+        value = os.environ.get(key)
+        if value:
+            return _clean_database_url(value)
+
+    user = os.environ.get("PGUSER") or os.environ.get("POSTGRES_USER")
+    password = os.environ.get("PGPASSWORD") or os.environ.get("POSTGRES_PASSWORD")
+    host = (
+        os.environ.get("PGHOST_UNPOOLED")
+        or os.environ.get("POSTGRES_HOST")
+        or os.environ.get("PGHOST")
+    )
+    database = os.environ.get("PGDATABASE") or os.environ.get("POSTGRES_DATABASE")
+    if user and password and host and database:
+        return _clean_database_url(
+            f"postgresql://{user}:{password}@{host}/{database}?sslmode=require"
+        )
+    return None
 
 
 class Settings(BaseSettings):
@@ -41,17 +89,16 @@ class Settings(BaseSettings):
     def load_database_url_from_env(cls, data):
         if not isinstance(data, dict):
             data = {}
-        # Always prefer raw os.environ (Render/Vercel inject here)
-        env_url = os.environ.get("DATABASE_URL")
-        if env_url:
-            data["database_url"] = env_url
+        resolved = resolve_database_url_from_env()
+        if resolved:
+            data["database_url"] = resolved
         return data
 
     @field_validator("database_url", mode="before")
     @classmethod
     def normalize_database_url(cls, v: str | None) -> str | None:
-        if v and v.startswith("postgres://"):
-            return v.replace("postgres://", "postgresql://", 1)
+        if v:
+            return _clean_database_url(v)
         return v
 
     @model_validator(mode="after")
@@ -61,21 +108,18 @@ class Settings(BaseSettings):
         if not url:
             if _is_cloud_host():
                 raise ValueError(
-                    "DATABASE_URL is missing. This app cannot use localhost in the cloud.\n\n"
-                    "Fix:\n"
-                    "  1. Create a free PostgreSQL database at https://neon.tech\n"
-                    "  2. Copy the connection string\n"
-                    "  3. In Render (or your API host) → Environment → add:\n"
-                    "     DATABASE_URL=postgresql://user:pass@host/db?sslmode=require\n"
-                    "  4. Redeploy the API service\n\n"
-                    "Deploy frontend on Vercel + API on Render + DB on Neon (see README.md)."
+                    "No PostgreSQL connection string found.\n\n"
+                    "Vercel + Neon:\n"
+                    "  1. Vercel Dashboard → Storage → Neon → Connect to Project\n"
+                    "  2. This adds POSTGRES_URL automatically — redeploy after connecting\n\n"
+                    "Or set manually: DATABASE_URL or POSTGRES_URL_NON_POOLING"
                 )
             url = LOCAL_DATABASE_URL
 
         if _is_cloud_host() and ("localhost" in url or "127.0.0.1" in url):
             raise ValueError(
-                "DATABASE_URL points to localhost but you are running in the cloud.\n"
-                "Replace it with your Neon/Supabase PostgreSQL connection string."
+                "Database URL points to localhost in the cloud.\n"
+                "Connect Neon to your Vercel project (Storage tab)."
             )
 
         object.__setattr__(self, "database_url", url)
@@ -83,7 +127,14 @@ class Settings(BaseSettings):
 
     @property
     def cors_origin_list(self) -> list[str]:
-        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+        origins = [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+        vercel_url = os.getenv("VERCEL_URL")
+        if vercel_url:
+            origins.append(f"https://{vercel_url}")
+        preview = os.getenv("VERCEL_BRANCH_URL")
+        if preview:
+            origins.append(f"https://{preview}")
+        return list(dict.fromkeys(origins))
 
     @property
     def is_production(self) -> bool:
