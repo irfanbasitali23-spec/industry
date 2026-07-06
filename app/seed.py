@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 
 from app.auth import get_password_hash
 from app.config import settings
-from app.models import FormField, FormSubmission, FormTemplate, User
+from app.models import FormField, FormTemplate, User
 
 TEMPLATE_VERSION = 2
 
@@ -52,10 +52,30 @@ DEFAULT_FIELDS = [
 ]
 
 
-def _add_fields(db: Session, template_id: int):
+def _seed_template(db: Session):
+    template = db.query(FormTemplate).filter(FormTemplate.is_active == True).first()
+
+    if not template:
+        template = FormTemplate(
+            name="Preventive Care Visit",
+            version=TEMPLATE_VERSION,
+            is_active=True,
+            style_config=DEFAULT_STYLE,
+        )
+        db.add(template)
+        db.flush()
+    elif template.version < TEMPLATE_VERSION:
+        template.name = "Preventive Care Visit"
+        template.version = TEMPLATE_VERSION
+        template.style_config = DEFAULT_STYLE
+        db.query(FormField).filter(FormField.template_id == template.id).delete()
+        db.flush()
+    else:
+        return
+
     for idx, field_data in enumerate(DEFAULT_FIELDS):
         db.add(FormField(
-            template_id=template_id,
+            template_id=template.id,
             section=field_data["section"],
             field_number=field_data["field_number"],
             label=field_data["label"],
@@ -63,53 +83,6 @@ def _add_fields(db: Session, template_id: int):
             options=field_data["options"],
             sort_order=idx,
         ))
-
-
-def _template_has_submissions(db: Session, template_id: int) -> bool:
-    return (
-        db.query(FormSubmission)
-        .filter(FormSubmission.template_id == template_id)
-        .count()
-        > 0
-    )
-
-
-def _create_template(db: Session) -> FormTemplate:
-    template = FormTemplate(
-        name="Preventive Care Visit",
-        version=TEMPLATE_VERSION,
-        is_active=True,
-        style_config=DEFAULT_STYLE,
-    )
-    db.add(template)
-    db.flush()
-    _add_fields(db, template.id)
-    return template
-
-
-def _seed_template(db: Session):
-    template = db.query(FormTemplate).filter(FormTemplate.is_active == True).first()
-
-    if not template:
-        _create_template(db)
-        return
-
-    if template.version >= TEMPLATE_VERSION:
-        return
-
-    # Upgrade needed — never delete fields that existing submissions reference
-    if _template_has_submissions(db, template.id):
-        template.is_active = False
-        _create_template(db)
-    else:
-        template.name = "Preventive Care Visit"
-        template.version = TEMPLATE_VERSION
-        template.style_config = DEFAULT_STYLE
-        db.query(FormField).filter(FormField.template_id == template.id).delete(
-            synchronize_session=False
-        )
-        db.flush()
-        _add_fields(db, template.id)
 
 
 def seed_database(db: Session):

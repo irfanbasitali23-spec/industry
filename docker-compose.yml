@@ -24,21 +24,13 @@ services:
     ports:
       - "8000:8000"
     environment:
-      # Docker always uses the local PostgreSQL container (not Neon)
       DATABASE_URL: postgresql://${POSTGRES_USER:-inspection_user}:${POSTGRES_PASSWORD:-inspection_pass}@db:5432/${POSTGRES_DB:-machine_inspection}
       SECRET_KEY: ${SECRET_KEY:-change-this-secret-key-in-production}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:8000}
     depends_on:
       db:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')\""]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-      start_period: 20s
     volumes:
       - ./app:/app/app
 
@@ -49,8 +41,7 @@ services:
     ports:
       - "3000:80"
     depends_on:
-      web:
-        condition: service_healthy
+      - web
 
 volumes:
   postgres_data:

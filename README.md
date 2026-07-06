@@ -1,78 +1,81 @@
 # Machine Inspection System
 
-## Docker deployment (containers)
+A full-stack machine inspection checklist platform with a **React** frontend, **FastAPI** backend, and **PostgreSQL** database — all in Docker.
 
-Run everything locally or on any server with Docker:
+## Features
+
+- **React UI** — Modern design with Tailwind CSS, Framer Motion animations, responsive layout
+- **User Dashboard** — Fill 26-point inspection forms with digital signatures
+- **Admin Dashboard** — View submissions, customize form style, manage questions & users
+- **PostgreSQL** — Persistent storage for all data
+- **Docker** — One command to run everything
+
+## Quick Start (Docker)
 
 ```bash
-docker compose up -d --build
+docker compose up --build
 ```
 
-| Service    | URL                        |
-|------------|----------------------------|
-| **App UI** | http://localhost:3000      |
-| **API**    | http://localhost:8000      |
-| **Health** | http://localhost:8000/api/health |
+| Service  | URL                        |
+|----------|----------------------------|
+| Frontend | http://localhost:3000      |
+| API      | http://localhost:8000      |
 
-### Login
+### Demo Accounts
 
-| Role  | Username | Password   |
-|-------|----------|------------|
-| Admin | `admin`  | `admin123`   |
-| User  | `user`   | `user123`    |
+| Role  | Username | Password  |
+|-------|----------|-----------|
+| Admin | admin    | admin123  |
+| User  | user     | user123   |
 
-### Useful commands
+## Local Development
+
+**Backend:**
+```bash
+docker compose up db -d
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
+```
+
+**Frontend:**
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Open http://localhost:5173 (Vite proxies `/api` to backend)
+
+## Architecture
+
+```
+├── app/                  # FastAPI backend (API only)
+│   ├── main.py
+│   ├── models.py
+│   ├── routers/          # auth, forms, admin APIs
+│   └── seed.py           # 26 checklist items
+├── frontend/             # React + Vite + Tailwind
+│   ├── src/
+│   │   ├── pages/        # Login, Dashboard, Admin pages
+│   │   ├── components/   # Layout, SignaturePad, etc.
+│   │   └── api/          # API client
+│   └── Dockerfile        # nginx production build
+└── docker-compose.yml    # db + api + frontend
+```
+
+## Tech Stack
+
+| Layer    | Technology                          |
+|----------|-------------------------------------|
+| Frontend | React 18, Vite, Tailwind, Framer Motion |
+| Backend  | FastAPI, SQLAlchemy, JWT            |
+| Database | PostgreSQL 16                       |
+| Deploy   | Docker Compose, nginx                 |
+
+## Stop
 
 ```bash
-# Start in background
-docker compose up -d --build
-
-# View logs
-docker compose logs -f
-
-# Stop
 docker compose down
-
-# Stop and delete database data
-docker compose down -v
-
-# Restart after code changes
-docker compose up -d --build
 ```
 
-### Optional: custom `.env`
-
-```bash
-copy .env.example .env
-```
-
-Edit `.env` for Docker (local database only — do **not** add Neon `POSTGRES_URL` here):
-
-```env
-POSTGRES_USER=inspection_user
-POSTGRES_PASSWORD=inspection_pass
-POSTGRES_DB=machine_inspection
-SECRET_KEY=your-secret-key
-ADMIN_PASSWORD=your-admin-password
-```
-
-Then run:
-
-```bash
-docker compose up -d --build
-```
-
-Docker uses the **local PostgreSQL container** — Neon credentials are **not** needed for Docker.
-
----
-
-## Vercel + Neon (cloud)
-
-See [VERCEL_SETUP.md](VERCEL_SETUP.md) for cloud deployment.
-
----
-
-## Requirements
-
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed and running
-- Ports **3000**, **8000**, **5432** available
+Remove data: `docker compose down -v`
