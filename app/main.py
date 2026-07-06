@@ -11,13 +11,24 @@ from app.seed import seed_database
 
 
 def _init_db():
-    Base.metadata.create_all(bind=engine)
-    migrate_database()
-    db = SessionLocal()
+    from sqlalchemy.exc import OperationalError
+
     try:
-        seed_database(db)
-    finally:
-        db.close()
+        Base.metadata.create_all(bind=engine)
+        migrate_database()
+        db = SessionLocal()
+        try:
+            seed_database(db)
+        finally:
+            db.close()
+    except OperationalError as exc:
+        if "localhost" in str(settings.database_url) or "127.0.0.1" in str(settings.database_url):
+            raise SystemExit(
+                "\n[DATABASE ERROR] Cannot connect to PostgreSQL on localhost.\n\n"
+                "Local fix:  docker compose up --build\n"
+                "Cloud fix:  set DATABASE_URL to Neon connection string on Render (see README.md)\n"
+            ) from exc
+        raise
 
 
 @asynccontextmanager
